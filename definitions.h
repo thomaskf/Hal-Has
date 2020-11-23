@@ -59,14 +59,13 @@
 // The version of the program
 // ==================================================================================================
 
-#define VERSION "1.4"
+#define VERSION "2.6.3"
 
 // ==================================================================================================
 // The contact person of the program
 // ==================================================================================================
 
-#define CONTACTPERSON "Lars Jermiin <Lars.Jermiin@anu.edu.au>"
-#define CONTACTPERSON2 "Thomas Wong <Thomas.Wong@anu.edu.au>"
+#define CONTACTPERSON "Lars Jermiin <Lars.Jermiin@anu.edu.au>, Thomas Wong <Thomas.Wong@anu.edu.au>"
 
 // ==================================================================================================
 // Uncomment the following line if the dataset is very large, in order to speed up the program
@@ -92,18 +91,18 @@
 // ==================================================================================================
 
 // uncomment the following line to use old set of parameters
-#define USE_OLD_PARAM
+// #define USE_OLD_PARAM
 
 #ifdef USE_OLD_PARAM
 	#define DEFAULT_OPT_MODE "1"  // the mode of the optimization method
 #else
-	#define DEFAULT_OPT_MODE "3,6"  // the mode of the optimization method
+	#define DEFAULT_OPT_MODE "5"  // the mode of the optimization method
 #endif
 
 #ifdef USE_OLD_PARAM
 	#define DEFAULT_OPT_MAXIT "1000" // the maxIT of the optimization method
 #else
-	#define DEFAULT_OPT_MAXIT "10,1" // the maxIT of the optimization method
+	#define DEFAULT_OPT_MAXIT "10" // the maxIT of the optimization method
 #endif
 
 #define PRECISE_MODE "1,3,6"

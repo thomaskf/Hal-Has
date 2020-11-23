@@ -120,7 +120,8 @@ public:
 	void insert(vector<int>& matrix, vector<int>& untouch, double parentIC, int node, int insertToSet, int mode, int maxIT);
 	void insert(vector<int>& matrix, vector<int>& untouch, double parentIC, ParameterSet& ps, VariableSet& vs, int insertToSet);
 	void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, ParameterSet& ps, VariableSet& vs, double IC, int node, int insertToSet, double lowPossibleIC);
-
+    void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, double IC, int node, int insertToSet, double lowPossibleIC);
+    
 	void insert(vector<int>& matrix, vector<int>& untouch, double parentIC, int node, int insertToSet, ParameterSet& parent_ps, VariableSet& parent_vs);
 
 	void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, ParameterSet& ps, VariableSet& vs, double IC, int node, int insertToSet, double lowPossibleIC, ParameterSet& parent_ps, VariableSet& parent_vs);
@@ -130,12 +131,21 @@ public:
 	
 	void insert(vector<int>& matrix, vector<int>& untouch, double parentIC, int node, int insertToSet, ParameterSet& parent_ps, VariableSet& parent_vs, int mode, int maxIT);
 	
-	void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, ParameterSet& ps, VariableSet& vs, double IC, int node, int insertToSet, double lowPossibleIC, ParameterSet& parent_ps, VariableSet& parent_vs, int mode, int maxIT);
+    void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, double IC, int node, int insertToSet, double lowPossibleIC, int mode, int maxIT);
+
+    void insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, ParameterSet& ps, VariableSet& vs, double IC, int node, int insertToSet, double lowPossibleIC, ParameterSet& parent_ps, VariableSet& parent_vs, int mode, int maxIT);
 
 	// insert an item
 	void insertwMap(vector<int>& matrix, double logL, double IC, double parentIC, ParameterSet& ps, VariableSet& vs, 
 			vector<int>& untouch, int numIter, double lowPossibleIC);
 
+    // insert an item
+    void insertwMap(vector<int>& matrix, double logL, double IC, double parentIC,
+            vector<int>& untouch, int numIter, double lowPossibleIC);
+
+    // insert an item
+    void insertwMap(vector<int>& matrix, double logL, double IC, vector<int>& untouch, double lowPossibleIC);
+    
 	// find ID by matrix
 	int getID(vector<int>& matrix);
 

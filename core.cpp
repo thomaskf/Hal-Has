@@ -207,6 +207,117 @@ void genTopMatrixFrStr(string newickStr, int** topMatrix, int* rowNum, vector<st
 	}
 }
 
+// Input: topology string (NO RATE GROUP)
+// Output: 1. Topology matrix; 2. number of rows of the matrix, 3. List of leaf names,
+//         4. corresponding rate matrix, 5. edge length
+void genTopMatrixFrStr0(string newickStr, int** topMatrix, int* rowNum, vector<string>** leafList, vector<int>* rateMatrix, vector<double>* edgeLens) {
+
+	trim(newickStr);
+	if (newickStr.length()==0) {
+		cerr << "Error! The topology string is empty" << endl;
+		exit(1);
+	}
+
+	// get the number of rows in the matrix
+	(*rowNum) = howManyCharInside(newickStr, ',');
+
+	if ((*rowNum) == 0) {
+		*topMatrix = NULL;
+		*leafList = NULL;
+		return;
+	}
+
+	// initialize the topMatrix and leafList
+	(*topMatrix) = new int[(*rowNum) * 2];
+	(*leafList) = new vector<string>;
+
+	// create another array to store the nodes waiting to be processed
+	vector<int> waitNodeList;
+	vector<double> waitNodeDist;
+
+	// the number of new nodes formed
+	int newNodeNum = 0;
+
+	// name of current leaf reading
+	string currLeaf = "";
+	string currDist = "";
+	int distMode = 0;
+	
+	// skip because of '['
+	int skip = 0;
+
+	for (int i=0; i<(int)newickStr.length(); i++) {
+		char c = newickStr.at(i);
+		if (c=='[') {
+			skip = 1;
+			continue;
+		}
+		if (c==']') {
+			skip = 0;
+			continue;
+		}
+		if (skip == 1)
+			continue;
+		if (c == ';')
+			break;
+		if (c == '(' || c == ' ') {
+			continue; // do nothing
+		} else if (c == ',') {
+			// add the current leaf to leafList if necessary
+			if (currLeaf != "") {
+				(*leafList)->push_back(currLeaf);
+				waitNodeList.push_back(-1 * (int)((*leafList)->size()));
+				currLeaf = "";
+			}
+			if (currDist != "") {
+				waitNodeDist.push_back((double) atof(currDist.c_str()));
+				currDist = "";
+			}
+			distMode = 0;
+		} else if (c == ')') {
+			if (currLeaf != "") {
+				// add the current leaf to leafList
+				(*leafList)->push_back(currLeaf);
+				waitNodeList.push_back(-1 * (int)((*leafList)->size()));
+				currLeaf = "";
+			}
+			if (currDist != "") {
+				waitNodeDist.push_back((double) atof(currDist.c_str()));
+				currDist = "";
+			}
+			distMode = 0;
+			// get the last two nodes which are waiting to be processed
+			int last1 = waitNodeList.back();
+			waitNodeList.pop_back();
+			int last2 = waitNodeList.back();
+			waitNodeList.pop_back();
+			// add a new row into the topMatrix
+			(*topMatrix)[newNodeNum*2] = last2;
+			(*topMatrix)[newNodeNum*2+1] = last1;
+			if (edgeLens != NULL && waitNodeDist.size() >= 2) {
+				double temp = waitNodeDist.back();
+				waitNodeDist.pop_back();
+				edgeLens->push_back(waitNodeDist.back());
+				waitNodeDist.pop_back();
+				edgeLens->push_back(temp);
+			}
+			waitNodeList.push_back(++newNodeNum);
+		} else if (c == ':' && edgeLens!=NULL) {
+			if (currDist!="") {
+				// the one in "currDist" is not the distance, but a part of the name
+				currLeaf.append(":");
+				currLeaf.append(currDist);
+				currDist = "";
+			}
+			distMode = 1;
+		} else if (distMode==0) {
+			currLeaf.append(1,c); // append the character to currLeaf
+		} else if (distMode==1) {
+			currDist.append(1,c);
+		}
+	}
+}
+
 // Input: Topology file
 // Output: 1. Topology matrix; 2. number of rows of the matrix, 3. List of leaf names,
 //         4. corresponding rate matrix, 5. edge length
@@ -231,26 +342,22 @@ void genTopMatrix(char* topFile, int** topMatrix, int* rowNum, vector<string>** 
 		cerr << "Error! The first line of the topology file " << topFile << " is empty" << endl;
 		exit(1);
 	}
-	genTopMatrixFrStr(aline, topMatrix, rowNum, leafList, rateMatrix, edgeLens);
+	genTopMatrixFrStr0(aline, topMatrix, rowNum, leafList, rateMatrix, edgeLens);
 }
 
 // get the name of the IC
 string getICName(int ICType) {
 	// information criteria name
-	// 1 - AIC; 2 - Adjusted BIC; 3 - BIC; 4 - CAIC
-
+	// 1 - AIC; 2 - AICc; 3 - BIC
 	switch (ICType) {
 	case 1:
 		return "AIC";
 		break;
 	case 2:
-		return "Adjusted BIC";
+		return "AICc";
 		break;
 	case 3:
 		return "BIC";
-		break;
-	case 4:
-		return "CAIC";
 		break;
 	default:
 		return "IC";
@@ -261,16 +368,14 @@ string getICName(int ICType) {
 // get the IC-type of the IC name
 int getICType(string ICName) {
 	// information criteria name
-	// 1 - AIC; 2 - Adjusted BIC; 3 - BIC; 4 - CAIC
+	// 1 - AIC; 2 - AICc; 3 - BIC
 	trim(ICName);
 	if (ICName=="AIC")
 		return 1;
-	else if (ICName == "Adjusted BIC")
+	else if (ICName == "AICc")
 		return 2;
 	else if (ICName == "BIC")
 		return 3;
-	else if (ICName == "CAIC")
-		return 4;
 	else
 		return 0;
 }
@@ -287,6 +392,24 @@ double getIC(double logVal, int numRates, int nsites, int nTaxa, int ICType, int
 	int df;
 	int use_reg = 1;
 	return getIC(logVal, numRates, nsites, nTaxa, df, ICType, numRateChanges, sameRootMat, use_reg);
+}
+
+// f(n,k) =
+//    2k,            for AIC
+//    (2nk)/(n-k-1), for AICc
+//    ln(n)k,        for BIC
+double f(int n, double k, int ICType) {
+	switch(ICType) {
+	case 1:
+		return (2.0 * k); // AIC
+		break;
+	case 2:
+		return (2.0 * n * k) / (n - k - 1.0); // AICc
+		break;
+	default:
+		return (log(n) * k); // BIC
+		break;
+	}
 }
 
 // core function for computing the IC value under HAL model
@@ -312,32 +435,26 @@ double getIC(double logVal, int numRates, int nsites, int nTaxa, int& df, int IC
 	df -= 6; // deduce: (root frequencies) and (char distribution in invariable sites)
 #endif
 
-	double An;
-	switch(ICType) {
-	case 1:
-		An=2; // AIC
-		break;
-	case 2:
-		An=log((nsites+2.0)/24.0); // Adjusted BIC
-		break;
-	case 4:
-		An=log(nsites+1); // CAIC
-		break;
-	default:
-		An=log(nsites); // BIC
-		break;
-	}
+	// information criteria formula
+	// IC = -2 ln(L) + f(n, df)
+	
+	// regularization for IC
+	// IC = -2 ln(L) + f(n, df + mc)
+
+	// where f(n,k) =
+	//    2k,            for AIC
+	//    (2nk)/(n-k-1), for AICc
+	//    ln(n)k,        for BIC
 
 	double ic;
-	// newly added for regularization for IC
-	if (use_reg) {
+	if (use_reg) { // regularization
 		int numConvergentChanges = numRateChanges - numRates + 1;
 		if (numConvergentChanges == 0 || C_REG == 0)
-			ic = -2.0 * logVal + An * df;
+			ic = -2.0 * logVal + f(nsites, df, ICType);
 		else
-			ic = -2.0 * logVal + An * (df + numConvergentChanges * C_REG);
+			ic = -2.0 * logVal + f(nsites, df + numConvergentChanges * C_REG, ICType);
 	} else {
-		ic = -2.0 * logVal + An * df;
+		ic = -2.0 * logVal + f(nsites, df, ICType);
 	}
 
 	return ic;
@@ -348,7 +465,7 @@ double getIC(double logVal, int numRates, int nsites, int nTaxa, int& df, int IC
 // numRateCat : number of rate categories
 // numRateMat : number of rate matrices
 // isUpsilonModel : whether it is an upsilon model
-// output: 1. df - degree of freedom; 2. bic - IC value
+// output: 1. df - degree of freedom; 2. ic - IC value
 double getIC(double logVal, int numRateMat, int nsites, int nTaxa, int numRateCat,
 		int modelType, int& df, int isUpsilonModel, int ICType, 
 		int numRateChanges, int sameRootMat, int use_reg) {
@@ -409,32 +526,16 @@ double getIC(double logVal, int numRateMat, int nsites, int nTaxa, int numRateCa
 		// (1) edge lengths: numEdges, (2) S: 5, (3) Pi: 3 , (4) alpha: numRateCat-1, (5) scalar: numRateCat-1
 		df = numEdges + 6 + 2 * numRateCat;
 	}
-	double An;
-	switch(ICType) {
-	case 1:
-		An=2; // AIC
-		break;
-	case 2:
-		An=log((nsites+2.0)/24.0); // Adjusted BIC
-		break;
-	case 4:
-		An=log(nsites+1); // CAIC
-		break;
-	default:
-		An=log(nsites); // BIC
-		break;
-	}
-
-	// newly added for regularization for IC
+	
 	double ic;
-	if (use_reg) {
+	if (use_reg) { // regularization
 		int numConvergentChanges = numRateChanges - numRateMat + 1;
 		if (numConvergentChanges == 0 || C_REG == 0)
-			ic = -2.0 * logVal + An * df;
+			ic = -2.0 * logVal + f(nsites, df, ICType);
 		else
-			ic = -2.0 * logVal + An * (df + numConvergentChanges * C_REG);
+			ic = -2.0 * logVal + f(nsites, df + numConvergentChanges * C_REG, ICType);
 	} else {
-		ic = -2.0 * logVal + An * df;
+		ic = -2.0 * logVal + f(nsites, df, ICType);
 	}
 
 	return ic;

@@ -133,6 +133,7 @@ void UserOptions::reset() {
 		groupAllCandidates = 2;
 	}
 	preLogFile = "";
+    preLog = "";
 	outputPrefix = "";
 	minRateCat = 1;
 	maxRateCat = 4;
@@ -237,6 +238,7 @@ void UserOptions::outputHALBUUsage(char* progName, int isMPI) {
 	cout << "                        <checkpoint file>, which was outputted from the last" << endl;
 	cout << "                        execution of the program, stores all the immediate" << endl;
 	cout << "                        results (with file extension: '.chkpt.txt')" << endl;
+    cout << "  -z <previous log>   : Load the log file too (for testing only)" << endl;
 	cout << "  -i <# of iterations>: Number of iterations performed for each-time" << endl;
 	cout << "                        parameter tuning" << endl;
 	cout << "                        (default: -1 [no limit, run until converge])" << endl;
@@ -342,7 +344,6 @@ void UserOptions::outputHALBUUsage(char* progName, int isMPI) {
 		cout << "      $ " << progName << " data.phy tree.txt" << endl << endl;
 
 	cout << "Contact: " << CONTACTPERSON << endl;
-	cout << "         " << CONTACTPERSON2 << endl;
 	cout << "================================================================================" << endl;
 }
 
@@ -409,7 +410,6 @@ void UserOptions::outputHALTDUsage(char* progName, int isMPI) {
 		cout << "      $ " << progName << " data.phy tree.txt data.BU.result.txt" << endl << endl;
 
 	cout << "Contact: " << CONTACTPERSON << endl;
-	cout << "         " << CONTACTPERSON2 << endl;
 	cout << "================================================================================" << endl;
 }
 
@@ -510,7 +510,6 @@ void UserOptions::outputHASUsage(char* progName, int isMPI) {
 		cout << "      $ " << progName << " data.phy tree.txt -t " << hal_result_file << endl << endl;
 
 	cout << "Contact: " << CONTACTPERSON << endl;
-	cout << "         " << CONTACTPERSON2 << endl;
 	cout << "================================================================================" << endl;
 }
 
@@ -555,7 +554,6 @@ void UserOptions::outputUpsilonUsage(char* progName) {
 	cout << "                                      the program when necessary)" << endl;
 	cout << "  2. <output prefix>.Upsilon.result.txt - the resulting optimal rate matrices" << endl << endl;
 	cout << "Contact: " << CONTACTPERSON << endl;
-	cout << "         " << CONTACTPERSON2 << endl;
 	cout << "================================================================================" << endl;
 }
 
@@ -605,6 +603,7 @@ int UserOptions::readArguments(int argc, char** argv, string* errMsg) {
 	bool w_option_assigned = false;
 	bool x_option_assigned = false;
 	bool y_option_assigned = false;
+    bool z_option_assigned = false;
 	bool precise_option_assigned = false;
 	int num_ic_selected = 0;
 
@@ -732,6 +731,18 @@ int UserOptions::readArguments(int argc, char** argv, string* errMsg) {
 						preLogFile = value;
 				}
 				break;
+
+            case 'z':
+                if (z_option_assigned)
+                    duplicateOption = true;
+                else {
+                    z_option_assigned = true;
+                    if (value.length() == 0)
+                        emptyOption = true;
+                    else
+                        preLog = value;
+                }
+                break;
 
 			case 'i':
 				if (i_option_assigned)

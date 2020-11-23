@@ -57,9 +57,10 @@
 //
 // options              : the user options
 // rateGrpFile          : the rate group to start with
-// preLogFile           : The output file of the previous run.
+// preChkptFile         : The checkpoint file of the previous run.
+// preLogFile           : The log file of the previous run.
 //                        One wants to resume the process from the previous run.
-void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int num_chars) {
+void performRAL(UserOptions* options, char* rateGrpFile, char* preChkptFile, int num_chars, char* preLogFile) {
 
 #ifdef GET_TIME_STAT
 	pre_time = clock();
@@ -158,16 +159,24 @@ void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int n
 	
 	vector<int> untouchNodes(numEdges,0);
 
-	// Load previous intermediate results from the log file if necessary
+	// Load previous intermediate results if the checkpoint file exists
 	TempRateMats* preInterResult = NULL;
-	if (preLogFile != NULL) {
+	if (preChkptFile != NULL) {
 		int num_alpha = 1; // for RAL
 		options->info_criteria = firstNonZeroPos(options->ic_list, TOTAL_NUM_IC)+1;
-		preInterResult = loadPreInterResult(preLogFile, num_w, numEdges, num_alpha, options->info_criteria, 
+		preInterResult = loadPreInterResult(preChkptFile, num_w, numEdges, num_alpha, options->info_criteria, 
 				alignment.numSites, alignment.numSeqs, options->logLDeviation, num_chars, topMatrix);
 	} else {
 		preInterResult = new TempRateMats;
 	}
+    
+    // Load previous log file (not checkpoint file) (added on Oct 12, 2020)
+    if (preLogFile != NULL) {
+        int num_alpha = 1; // for RAL
+        options->info_criteria = firstNonZeroPos(options->ic_list, TOTAL_NUM_IC)+1;
+        loadPreLogResult(preLogFile, num_w, numEdges, num_alpha, options->info_criteria,
+                         alignment.numSites, alignment.numSeqs, options->logLDeviation, num_chars, topMatrix, preInterResult);
+    }
 
 	// term of the approach
 	string approachTerm = "";
@@ -180,6 +189,18 @@ void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int n
 		break;
 	case 3:
 		approachTerm = "BUTD";
+		break;
+	case 4:
+		approachTerm = "NEW-BU";
+		break;
+	case 6:
+		approachTerm = "BF";
+		break;
+	case 7:
+		approachTerm = "JOHN";
+		break;
+	case 8:
+		approachTerm = "NEW2";
 		break;
 	default:
 		approachTerm = "OTHER";
@@ -194,9 +215,9 @@ void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int n
 	if (options->outChkPtFile && options->outputPrefix.length() > 0) {
 		outChkptFile = options->outputPrefix + "." + approachTerm + ".chkpt.txt";
 		chkptOut = new ofstream;
-		if (preLogFile != NULL) {
-			if (outChkptFile != string(preLogFile)) {
-				filecopy((char*) outChkptFile.c_str(), preLogFile);
+		if (preChkptFile != NULL) {
+			if (outChkptFile != string(preChkptFile)) {
+				filecopy((char*) outChkptFile.c_str(), preChkptFile);
 			}
 			chkptOut->open(outChkptFile.c_str(), std::ofstream::out | std::ofstream::app); // append to the log file
 		} else {
@@ -306,15 +327,15 @@ void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int n
 		// print out the content of the best hundred rate matrices
 		string description = "The best 100 arrangements of the rate matrices:";
 		bestHundredRateMatrices.print_content(resultOut, topMatrix, leafList, description, ICName);
-		if (options->listParamBestHAL && bestHundredRateMatrices.size() > 0) {
+		if (options->listParamBestHAL && bestHundredRateMatrices.size() > 0 && bestHundredRateMatrices.PSs[0]!=NULL) {
 			// list out the parameters of the best HAL model
 			(*resultOut) << "=====================================================================================" << endl;
 			(*resultOut) << "The corresponding parameters of the best HAL model:" << endl;
-			string currResult = "";
-			// (bestHundredRateMatrices.PSs[0])->updateContent(2);
-			(bestHundredRateMatrices.PSs[0])->showContent(currResult, topMatrix, leafList);
-			(bestHundredRateMatrices.VSs[0])->showContent(currResult, 1);
-			(*resultOut) << currResult << endl;
+            string currResult = "";
+            // (bestHundredRateMatrices.PSs[0])->updateContent(2);
+            (bestHundredRateMatrices.PSs[0])->showContent(currResult, topMatrix, leafList);
+            (bestHundredRateMatrices.VSs[0])->showContent(currResult, 1);
+            (*resultOut) << currResult << endl;
 			// show the tree
 			(bestHundredRateMatrices.PSs[0])->updateContent(1);
 			(*resultOut) << "The tree (whose edge lengths represent average # of substitutions per site):" << endl;
@@ -369,15 +390,15 @@ void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int n
 			// bestHundredRateMatrices.print_optimal_rateMatrices(resultOut, topMatrix, leafList, ICName);
 			bestHundredRateMatrices.print_optimal_rateMatrices(resultOut, topMatrix, leafList, alignment.numSites, options->info_criteria);
 			// bestHundredRateMatrices.print_content();
-			
+
 			// print out the content of the optimal rate matrices
 			optRateMatrix.print_content(resultOut, topMatrix, leafList, ICName);
 			
-			// print out the content of the best hundred rate matrices
+            // print out the content of the best hundred rate matrices
 			string description = "The best 100 arrangements of the rate matrices:";
 			bestHundredRateMatrices.print_content(resultOut, topMatrix, leafList, description, ICName);
-			
-			if (options->listParamBestHAL && bestHundredRateMatrices.size() > 0) {
+
+			if (options->listParamBestHAL && bestHundredRateMatrices.size() > 0 && bestHundredRateMatrices.PSs[0] != NULL) {
 				// list out the parameters of the best HAL model
 				(*resultOut) << "=====================================================================================" << endl;
 				(*resultOut) << "The corresponding parameters of the best HAL model:" << endl;
@@ -561,12 +582,17 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 				jobNeedToOutChkptFile.push_back(0); // no need to output the result to checkpoint file
 			} else {
 				int interID = preInterResult->getID(*(rateMatrixList->matrices[i]));
-				if (interID > -1) {
+				if (interID > -1 && (options->HALMode!=2 || preInterResult->PSs[interID] != NULL)) {
 					needToProcess = false;
-					rateMatrixList->PSs[i] = new ParameterSet(num_chars);
-					rateMatrixList->PSs[i]->copyFrom(*(preInterResult->PSs[interID]));
-					rateMatrixList->VSs[i] = new VariableSet(num_chars);
-					rateMatrixList->VSs[i]->copyFrom(*(preInterResult->VSs[interID]));
+                    if (preInterResult->PSs[interID] != NULL) {
+                        rateMatrixList->PSs[i] = new ParameterSet(num_chars);
+                        rateMatrixList->PSs[i]->copyFrom(*(preInterResult->PSs[interID]));
+                        rateMatrixList->VSs[i] = new VariableSet(num_chars);
+                        rateMatrixList->VSs[i]->copyFrom(*(preInterResult->VSs[interID]));
+                    } else {
+                        rateMatrixList->PSs[i] = NULL;
+                        rateMatrixList->VSs[i] = NULL;
+                    }
 					rateMatrixList->loglikelihood[i] = preInterResult->loglikelihood[interID];
 					rateMatrixList->ICs[i] = preInterResult->ICs[interID];
 					rateMatrixList->numIters[i] = preInterResult->numIters[interID];
@@ -703,13 +729,18 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 				// all numbers are rounded up, so that
 				// it is consistent with the intermediate results loaded from chkpt file
 
-				rateMatrixList->PSs[startItem + k] = new ParameterSet(num_chars);;
-				rateMatrixList->PSs[startItem + k]->copyFrom(*(jobList.PSs[opt_i]));
-				rateMatrixList->PSs[startItem + k]->roundContent();
+                if (jobList.PSs[opt_i] != NULL) {
+                    rateMatrixList->PSs[startItem + k] = new ParameterSet(num_chars);;
+                    rateMatrixList->PSs[startItem + k]->copyFrom(*(jobList.PSs[opt_i]));
+                    rateMatrixList->PSs[startItem + k]->roundContent();
 
-				rateMatrixList->VSs[startItem + k] = new VariableSet(num_chars);;
-				rateMatrixList->VSs[startItem + k]->copyFrom(*(jobList.VSs[opt_i]));
-				rateMatrixList->VSs[startItem + k]->roundContent();
+                    rateMatrixList->VSs[startItem + k] = new VariableSet(num_chars);;
+                    rateMatrixList->VSs[startItem + k]->copyFrom(*(jobList.VSs[opt_i]));
+                    rateMatrixList->VSs[startItem + k]->roundContent();
+                } else {
+                    rateMatrixList->PSs[startItem + k] = NULL;
+                    rateMatrixList->VSs[startItem + k] = NULL;
+                }
 
 				rateMatrixList->loglikelihood[startItem + k] = roundNumber(jobList.loglikelihood[opt_i], ANS_DECI);
 				rateMatrixList->ICs[startItem + k] = roundNumber(opt_IC, ANS_DECI);
@@ -720,9 +751,15 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 			// for startOptState = 2 (i.e. optimization starts from the state using one model)
 			// if this is the state where only one rate group is involved,
 			// then set the starting parameters and starting variables
-			if (options->startOptState==2 && rateMatrixList->numRates[startItem + k]==1) {
+			if (options->startOptState==2 && rateMatrixList->numRates[startItem + k]==1 && rateMatrixList->PSs[startItem + k]!=NULL) {
 				start_ps.copyFrom(*rateMatrixList->PSs[startItem + k]);
 				start_vs.copyFrom(*rateMatrixList->VSs[startItem + k]);
+			}
+			
+			// if this is the state where only one rate group is involved
+			// then compute the order of the edges
+			if (rateMatrixList->numRates[startItem + k]==1 && whichApproach==4 && rateMatrixList->PSs[startItem + k] != NULL) {
+				edgeOrder = getEdgeOrder(rateMatrixList->PSs[startItem + k], options->unrooted);
 			}
 		}
 		// output the intermediate results
@@ -731,9 +768,13 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 
 				// save the intermediate result to the array if necessary
 				if (saveToInterResult) {
-					preInterResult->insertwMap(*(rateMatrixList->matrices[i]), rateMatrixList->loglikelihood[i], rateMatrixList->ICs[i],
-							-1, *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), untouchzero,
-							rateMatrixList->numIters[i], rateMatrixList->lowPossibleICs[i]);
+                    if (rateMatrixList->PSs[i] == NULL)
+                        preInterResult->insertwMap(*(rateMatrixList->matrices[i]), rateMatrixList->loglikelihood[i], rateMatrixList->ICs[i],
+                                -1, untouchzero, rateMatrixList->numIters[i], rateMatrixList->lowPossibleICs[i]);
+                    else
+                        preInterResult->insertwMap(*(rateMatrixList->matrices[i]), rateMatrixList->loglikelihood[i], rateMatrixList->ICs[i],
+							    -1, *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), untouchzero,
+							    rateMatrixList->numIters[i], rateMatrixList->lowPossibleICs[i]);
 				}
 
 				// need to output the result
@@ -746,8 +787,10 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 					(*fout) << " " << ICName << ":" << longDoublToStr(rateMatrixList->ICs[i],ANS_DECI);
 					// (*fout) << " lowest_possible_IC:" << longDoublToStr(rateMatrixList->lowPossibleICs[i],ANS_DECI)
 					(*fout) << endl;
-					rateMatrixList->PSs[i]->showContent(fout);
-					rateMatrixList->VSs[i]->showContent(fout);
+                    if (rateMatrixList->PSs[i] != NULL) {
+                        rateMatrixList->PSs[i]->showContent(fout);
+                        rateMatrixList->VSs[i]->showContent(fout);
+                    }
 					for (int k=0; k<(int)rateMatrixList->matrices[i]->size(); k++) {
 						if (k>0)
 							(*fout) << ",";
@@ -770,30 +813,26 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 		// print the last 'numMatToCheck' items inside rateMatrixList
 		rateMatrixList->print_last_N(numMatToCheck, ICName);
 
-		/*** OBSOLATED ***
-		// save the top K items (among the last 'numMatToCheck' items) into the joblist
-		// and save the items whose IC < opt-IC when the log-L is increased by "logLDeviation" (newly added) 
-		jobList.clear();
-		double topIC;
-		if (startItem < rateMatrixList->size())
-			topIC = rateMatrixList->ICs[startItem];
-		for (i=startItem; i<rateMatrixList->size(); i++) {
-			if ((i < startItem+topK) || (rateMatrixList->lowPossibleICs[i] <= topIC))
-				jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
-		}
-		 */
 		// save the top K items (among the last 'numMatToCheck' items) into the joblist
 		jobList.clear();
 		for (i=startItem; i<rateMatrixList->size(); i++) {
 			if (groupAllCandidates==1) {
-				if (i < startItem+topK)
-					jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                if (i < startItem+topK) {
+                    if (rateMatrixList->PSs[i] != NULL)
+                        jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                    else
+                        jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                }
 			} else {
-				if (i < startItem+topK && rateMatrixList->ICs[i]<=rateMatrixList->parentICs[i])
-					jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                if (i < startItem+topK && rateMatrixList->ICs[i]<=rateMatrixList->parentICs[i]) {
+                    if (rateMatrixList->PSs[i] == NULL)
+                        jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], *(rateMatrixList->PSs[i]), *(rateMatrixList->VSs[i]), rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                    else
+                        jobList.insert(*(rateMatrixList->matrices[i]), *(rateMatrixList->untouches[i]), rateMatrixList->loglikelihood[i], rateMatrixList->parentICs[i], rateMatrixList->ICs[i], -1, insertToSet, rateMatrixList->lowPossibleICs[i]);
+                }
 			}
 		}
-
+        
 		// move the last 'numMatToCheck' items inside rateMatrixList to bestHundredRateMatrices
 		rateMatrixList->move_last_k_items(bestHundredRateMatrices, numMatToCheck, 1);
 
@@ -862,7 +901,6 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 			}
 		}
 
-
 		int new_candidates = 0;
 		if (options->numSteps==-1 || numStep++ < options->numSteps) {
 			for (i=0; i<jobList.size(); i++) {
@@ -876,6 +914,22 @@ void RALIterationNew (TempRateMats* rateMatrixList, int* topMatrix, int numLineT
 					if ((whichApproach==2 || whichApproach==3) && jobList.numRates[i] > 1) {
 						// generate all the potential rate matrices into the rateMatrixList (using top-down approach)
 						new_candidates += generateRateMatTD(rateMatrixList, jobList.matrices[i], jobList.PSs[i], jobList.VSs[i], jobList.ICs[i], topMatrix, internalID2line, jobList.untouches[i], jobList.numRates[i], thresHeight, options->unrooted);
+					}
+					if (whichApproach==4 && untouchedNodes>0) {
+						// generate all the potential rate matrices into the rateMatrixList (using new bottom-up version 1 approach)
+						new_candidates += generateRateMatNewBU1(rateMatrixList, jobList.matrices[i], jobList.PSs[i], jobList.VSs[i], jobList.loglikelihood[i], jobList.parentICs[i], jobList.ICs[i], topMatrix, leafID2line, internalID2line, jobList.untouches[i], numSpecies, jobList.numRates[i], jobList.lowPossibleICs[i], edgeOrder, options->unrooted);
+					}
+					if (whichApproach==6 && untouchedNodes>0) {
+						// generate all the potential rate matrices into the rateMatrixList (using bute-force approach)
+						new_candidates += generateRateMatButeForce(rateMatrixList, jobList.matrices[i], jobList.PSs[i], jobList.VSs[i], jobList.loglikelihood[i], jobList.parentICs[i], jobList.ICs[i], topMatrix, leafID2line, internalID2line, jobList.untouches[i], numSpecies, options->maxNumRatMat, jobList.lowPossibleICs[i], options->unrooted);
+					}
+					if ((whichApproach==7) && jobList.numRates[i] < numEdges) {
+						// generate all the potential rate matrices into the rateMatrixList (using John's bottom-up approach)
+						new_candidates += generateRateMatJohn(rateMatrixList, jobList.matrices[i], jobList.PSs[i], jobList.VSs[i], jobList.ICs[i], topMatrix, leafID2line, internalID2line, jobList.untouches[i], numSpecies, jobList.numRates[i], options->unrooted);
+					}
+					if (whichApproach==8 && untouchedNodes>0) {
+						// generate all the potential rate matrices into the rateMatrixList (using new bottom-up version 2 approach)
+						new_candidates += generateRateMatNewBU2(rateMatrixList, jobList.matrices[i], jobList.PSs[i], jobList.VSs[i], jobList.loglikelihood[i], jobList.parentICs[i], jobList.ICs[i], topMatrix, leafID2line, internalID2line, jobList.untouches[i], numSpecies, jobList.numRates[i], jobList.lowPossibleICs[i], options->unrooted);
 					}
 					if (new_candidates > pre_new_candidates) {
 						// print out the matrice
@@ -1191,11 +1245,11 @@ void reCalculateAllICs(TempRateMats* interResults, int ICType, int num_sites, in
 	}
 }
 
-// Load previous intermediate results from the log file
-TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int num_alpha, int ICType, 
+// Load previous intermediate results from the checkpoint file
+TempRateMats* loadPreInterResult(char* chkptFile, int num_w, int num_edges, int num_alpha, int ICType, 
 		int num_sites, int num_species, double logLDeviation, int num_chars, int* topMatrix) {
 	ifstream fin;
-	fin.open(logFile);
+	fin.open(chkptFile);
 	string aline;
 	vector<string> token;
 	size_t pos;
@@ -1218,7 +1272,7 @@ TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int nu
 	// get the name of the IC
 	string ICName = getICName(ICType);
 
-	cout << "loading the log file: " << logFile << endl << flush;
+	cout << "loading the checkpoint file: " << chkptFile << endl << flush;
 
 	while (getline(fin,aline)) {
 		// search for the word "iterations"
@@ -1240,6 +1294,8 @@ TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int nu
 
 			// get IC
 			need_recalculate_IC = true;
+            if (numIter == 0)
+                need_recalculate_IC = false;
 			/*
 			if (!getDoubleValues(token, ICName, &IC, 1)) {
 				// The IC name does not match, then the corresponding IC and the lowest possible IC needs to recalculate
@@ -1249,72 +1305,74 @@ TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int nu
 				need_recalculate_IC = false;
 			}*/
 
-			// get the details of PS
-			int edge = 0;
-			while ((edge<num_edges) && (getline(fin,aline))) {
-				trim(aline);
-				tokenizer(aline, " :[],\t", &token);
-				double* curr_w = &(PS.w[edge*num_w]);
-				double* curr_pi = &(PS.pi[edge*4]);
-				double* curr_t = &(PS.t[edge]);
-				if ((!getDoubleValues(token, curr_w, 0, num_w)) ||
-						(!getDoubleValues(token, curr_pi, num_w, 4)) ||
-						(!getDoubleValues(token, curr_t, num_w+4, 1))) {
-					break;
-				}
-				edge++;
-			}
-			if (edge!=num_edges) {
-				continue;
-			}
+            if (numIter > 0) {
+                // get the details of PS
+                int edge = 0;
+                while ((edge<num_edges) && (getline(fin,aline))) {
+                    trim(aline);
+                    tokenizer(aline, " :[],\t", &token);
+                    double* curr_w = &(PS.w[edge*num_w]);
+                    double* curr_pi = &(PS.pi[edge*4]);
+                    double* curr_t = &(PS.t[edge]);
+                    if ((!getDoubleValues(token, curr_w, 0, num_w)) ||
+                            (!getDoubleValues(token, curr_pi, num_w, 4)) ||
+                            (!getDoubleValues(token, curr_t, num_w+4, 1))) {
+                        break;
+                    }
+                    edge++;
+                }
+                if (edge!=num_edges) {
+                    continue;
+                }
 
 
-			// get the details of VS
-			// beta
-			if (getline(fin,aline)) {
-				trim(aline);
-				tokenizer(aline, " :[],\t", &token);
-				if (!getDoubleValues(token, &(VS.beta), 1, 1)) {
-					continue;
-				}
-			} else {
-				continue;
-			}
+                // get the details of VS
+                // beta
+                if (getline(fin,aline)) {
+                    trim(aline);
+                    tokenizer(aline, " :[],\t", &token);
+                    if (!getDoubleValues(token, &(VS.beta), 1, 1)) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
 
-			// alpha
-			if (getline(fin,aline)) {
-				trim(aline);
-				tokenizer(aline, " :[],\t", &token);
-				if (!getDoubleValues(token, VS.alpha, 1, num_alpha)) {
-					continue;
-				}
-				VS.num_alpha=num_alpha;
-			} else {
-				continue;
-			}
+                // alpha
+                if (getline(fin,aline)) {
+                    trim(aline);
+                    tokenizer(aline, " :[],\t", &token);
+                    if (!getDoubleValues(token, VS.alpha, 1, num_alpha)) {
+                        continue;
+                    }
+                    VS.num_alpha=num_alpha;
+                } else {
+                    continue;
+                }
 
-			// probXGivenInv
-			if (getline(fin,aline)) {
-				trim(aline);
-				tokenizer(aline, " :[],\t", &token);
-				if (!getDoubleValues(token, VS.probXGivenInv, 1, 4)) {
-					continue;
-				}
-			} else {
-				continue;
-			}
+                // probXGivenInv
+                if (getline(fin,aline)) {
+                    trim(aline);
+                    tokenizer(aline, " :[],\t", &token);
+                    if (!getDoubleValues(token, VS.probXGivenInv, 1, 4)) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
 
-			// rootNodeFreq
-			if (getline(fin,aline)) {
-				trim(aline);
-				tokenizer(aline, " :[],\t", &token);
-				if (!getDoubleValues(token, VS.rootNodeFreq, 1, 4)) {
-					continue;
-				}
-			} else {
-				continue;
-			}
-
+                // rootNodeFreq
+                if (getline(fin,aline)) {
+                    trim(aline);
+                    tokenizer(aline, " :[],\t", &token);
+                    if (!getDoubleValues(token, VS.rootNodeFreq, 1, 4)) {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+            
 			// rate matrix
 			if (getline(fin,aline)) {
 				trim(aline);
@@ -1352,12 +1410,89 @@ TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int nu
 			}
 
 			// load to the interResults array
-			interResults->insertwMap(matrix, loglikelihood, IC, -1, PS, VS, untouch, numIter, lowest_IC); 
+            if (numIter > 0)
+                interResults->insertwMap(matrix, loglikelihood, IC, -1, PS, VS, untouch, numIter, lowest_IC);
+            else
+                interResults->insertwMap(matrix, loglikelihood, IC, untouch, lowest_IC);
+            
 			numResults++;
 		}
 	}
-	interResults->print_content();
 	return interResults;
+}
+
+
+// Load previous log file (not checkpoint file)
+void loadPreLogResult(char* logFile, int num_w, int num_edges, int num_alpha, int ICType,
+        int num_sites, int num_species, double logLDeviation, int num_chars, int* topMatrix, TempRateMats* interResults) {
+    ifstream fin;
+    fin.open(logFile);
+    string aline;
+    vector<string> token;
+    size_t s_pos, t_pos;
+    string bic_str;
+    string rate_arrange_str;
+    string loglike_str;
+
+    vector<int> matrix(num_edges);
+    vector<int> untouch(num_edges,0);
+    double loglikelihood = 0.0;
+    double IC = 0.0;
+    double lowest_IC = LARGE_NUMBER;
+    int numRates;
+    int i;
+
+    // get the name of the IC
+    string ICName = getICName(ICType);
+
+    cout << "loading the log file: " << logFile << endl << flush;
+
+    while (getline(fin,aline)) {
+        if (aline.length() > 5 && aline[aline.length()-1]==']') {
+            // IC
+            s_pos = aline.find("IC");
+            if (s_pos==string::npos)
+                continue;
+            t_pos = aline.find_first_of("]", s_pos+4);
+            if (t_pos==string::npos)
+                continue;
+            bic_str = aline.substr(s_pos+4, t_pos-s_pos-4);
+            IC = atof(bic_str.c_str());
+
+            // get the rate matrix
+            s_pos = aline.find_first_of(" ");
+            if (s_pos==string::npos)
+                continue;
+            rate_arrange_str = aline.substr(0,s_pos);
+            tokenizer(rate_arrange_str.c_str(), " :[],\t", &token);
+            if (!getIntValues(token, matrix, 0, num_edges))
+                continue;
+            s_pos = aline.find("loglikelihood:");
+            if (s_pos==string::npos)
+                continue;
+
+            // log-likelihood
+            t_pos = aline.find_first_of("]", s_pos+15);
+            if (t_pos==string::npos)
+                continue;
+            loglike_str = aline.substr(s_pos+15, t_pos-s_pos-15);
+            loglikelihood = atof(loglike_str.c_str());
+
+            // number of rate matrix
+            // minimum 2
+            numRates = getNumRateGrp(matrix);
+            if (numRates == 1)
+                continue;
+            
+            // calculate the lowest IC
+            lowest_IC = IC - 2.0 * logLDeviation;
+
+            // load to the interResults array
+            interResults->insertwMap(matrix, loglikelihood, IC, untouch, lowest_IC);
+        }
+    }
+    // interResults->print_content();
+    // return interResults;
 }
 
 

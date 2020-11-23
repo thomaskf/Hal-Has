@@ -101,20 +101,11 @@ int main(int argc, char** argv) {
 
 	int num_chars = 4;
 	int isGTRUpilson = 0;
-	
-	for (int i=0; i<TOTAL_NUM_IC; i++) {
 
-		if (options.ic_list[i] == 0)
-			continue;
+	performRASMultiThres((char*) options.alignFile.c_str(), (char*)options.topFile.c_str(), (char*)options.rateMatrixFile.c_str(),
+			options.minRateCat, options.maxRateCat, options.numCPUThreads, options.randInitParam, options.numIterations,
+			options.outputPrefix, preChkptFile, options.info_criteria, &options, num_chars, isGTRUpilson);
 
-		options.info_criteria = i+1;
-
-		performRASMultiThres((char*) options.alignFile.c_str(), (char*)options.topFile.c_str(), (char*)options.rateMatrixFile.c_str(),
-				options.minRateCat, options.maxRateCat, options.numCPUThreads, options.randInitParam, options.numIterations,
-				options.outputPrefix, preChkptFile, options.info_criteria, &options, num_chars, isGTRUpilson);
-	
-	}
-	
 	// show the elapsed time
 	time_t endtime = time(0);
 	int days,hours,mins;

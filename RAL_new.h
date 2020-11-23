@@ -80,10 +80,10 @@ using namespace std;
 //
 // options              : the user options
 // rateGrpFile          : the rate group to start with
-// preLogFile           : The output file of the previous run.
+// preChkptFile         : The checkpoint file of the previous run.
+// preLogFile           : The log file of the previous run.
 //                        One wants to resume the process from the previous run.
-void performRAL(UserOptions* options, char* rateGrpFile, char* preLogFile, int num_chars);
-
+void performRAL(UserOptions* options, char* rateGrpFile, char* preChkptFile, int num_chars, char* preLogFile = NULL);
 
 
 // ============================================================================================================================
@@ -131,6 +131,10 @@ void reCalculateAllICs(TempRateMats* interResults, int ICType, int num_sites, in
 // Load previous intermediate results from the log file
 TempRateMats* loadPreInterResult(char* logFile, int num_w, int num_edges, int num_alpha, int ICType, 
 		int num_sites, int num_species, double logLDeviation, int num_chars, int* topMatrix);
+
+// Load previous log file (not checkpoint file)
+void loadPreLogResult(char* logFile, int num_w, int num_edges, int num_alpha, int ICType,
+        int num_sites, int num_species, double logLDeviation, int num_chars, int* topMatrix, TempRateMats* tmpRateMats);
 
 // ==================================================================================================
 // Maximize the likelihood value for the specific matrice arrangement

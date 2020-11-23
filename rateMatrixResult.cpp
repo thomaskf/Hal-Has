@@ -335,6 +335,41 @@ void TempRateMats::insert(vector<int>& matrix, vector<int>& untouch, double logL
 	}
 }
 
+void TempRateMats::insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, double IC, int node, int insertToSet, double lowPossibleIC) {
+    
+    insert(matrix, untouch, logL, parentIC, IC, node, insertToSet, lowPossibleIC, 1, 1);
+}
+
+void TempRateMats::insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, double IC, int node, int insertToSet, double lowPossibleIC, int mode, int maxIT) {
+    if (insertToSet==0 || matrices_set.find(matrix)==matrices_set.end()) {
+        vector<int>* new_matrix = new vector<int>;
+        new_matrix->assign(matrix.begin(),matrix.end());
+        matrices.push_back(new_matrix);
+        loglikelihood.push_back(logL);
+        ICs.push_back(IC);
+        parentICs.push_back(parentIC);
+        numRates.push_back(getNumRateGrp(matrix));
+        
+        PSs.push_back(NULL);
+        VSs.push_back(NULL);
+        parentPSs.push_back(NULL);
+        parentVSs.push_back(NULL);
+        
+        vector<int>* new_untouch = new vector<int>;
+        new_untouch->assign(untouch.begin(), untouch.end());
+        if (node!=-1) {
+            new_untouch->at(node) = 1;
+        }
+        untouches.push_back(new_untouch);
+        numIters.push_back(-1);
+        if (insertToSet==1)
+            matrices_set.insert(matrix);
+        lowPossibleICs.push_back(lowPossibleIC);
+        modes.push_back(mode);
+        maxITs.push_back(maxIT);
+        selected.push_back(0);
+    }
+}
 
 void TempRateMats::insert(vector<int>& matrix, vector<int>& untouch, double logL, double parentIC, ParameterSet& ps, VariableSet& vs, double IC, int node, int insertToSet, double lowPossibleIC, ParameterSet& parent_ps, VariableSet& parent_vs) {
 
@@ -386,7 +421,7 @@ void TempRateMats::insert(vector<int>& matrix, vector<int>& untouch, double logL
 // map<vector<int>,int,compForIntArray> matrices_map;
 
 // insert an item
-void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, double parentIC, ParameterSet& ps, VariableSet& vs, 
+void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, double parentIC,
 		vector<int>& untouch, int numIter, double lowPossibleIC) {
 
 	if (matrices_set.find(matrix)==matrices_set.end()) {
@@ -398,12 +433,8 @@ void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, doubl
 		ICs.push_back(IC);
 		parentICs.push_back(parentIC);
 		numRates.push_back(getNumRateGrp(matrix));
-		ParameterSet* new_ps = new ParameterSet(ps.num_chars);
-		new_ps->copyFrom(ps);
-		PSs.push_back(new_ps);
-		VariableSet* new_vs = new VariableSet(vs.num_chars);
-		new_vs->copyFrom(vs);
-		VSs.push_back(new_vs);
+		PSs.push_back(NULL);
+		VSs.push_back(NULL);
 		parentPSs.push_back(NULL);
 		parentVSs.push_back(NULL);
 		vector<int>* new_untouch = new vector<int>;
@@ -417,6 +448,69 @@ void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, doubl
 		maxITs.push_back(1);
 		selected.push_back(0);
 	}
+}
+
+// insert an item
+void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, double parentIC, ParameterSet& ps, VariableSet& vs,
+        vector<int>& untouch, int numIter, double lowPossibleIC) {
+
+    if (matrices_set.find(matrix)==matrices_set.end()) {
+        vector<int>* new_matrix = new vector<int>;
+        new_matrix->assign(matrix.begin(),matrix.end());
+        int currID = (int) matrices.size();
+        matrices.push_back(new_matrix);
+        loglikelihood.push_back(logL);
+        ICs.push_back(IC);
+        parentICs.push_back(parentIC);
+        numRates.push_back(getNumRateGrp(matrix));
+        ParameterSet* new_ps = new ParameterSet(ps.num_chars);
+        new_ps->copyFrom(ps);
+        PSs.push_back(new_ps);
+        VariableSet* new_vs = new VariableSet(vs.num_chars);
+        new_vs->copyFrom(vs);
+        VSs.push_back(new_vs);
+        parentPSs.push_back(NULL);
+        parentVSs.push_back(NULL);
+        vector<int>* new_untouch = new vector<int>;
+        new_untouch->assign(untouch.begin(), untouch.end());
+        untouches.push_back(new_untouch);
+        numIters.push_back(numIter);
+        matrices_set.insert(matrix);
+        matrices_map.insert(pair<vector<int>,int>(matrix,currID));
+        lowPossibleICs.push_back(lowPossibleIC);
+        modes.push_back(1);
+        maxITs.push_back(1);
+        selected.push_back(0);
+    }
+}
+
+// insert an item
+void TempRateMats::insertwMap(vector<int>& matrix, double logL, double IC, vector<int>& untouch, double lowPossibleIC) {
+
+    if (matrices_set.find(matrix)==matrices_set.end()) {
+        vector<int>* new_matrix = new vector<int>;
+        new_matrix->assign(matrix.begin(),matrix.end());
+        int currID = (int) matrices.size();
+        matrices.push_back(new_matrix);
+        loglikelihood.push_back(logL);
+        ICs.push_back(IC);
+        parentICs.push_back(0);
+        numRates.push_back(getNumRateGrp(matrix));
+        PSs.push_back(NULL);
+        VSs.push_back(NULL);
+        parentPSs.push_back(NULL);
+        parentVSs.push_back(NULL);
+        vector<int>* new_untouch = new vector<int>;
+        new_untouch->assign(untouch.begin(), untouch.end());
+        untouches.push_back(new_untouch);
+        numIters.push_back(0);
+        matrices_set.insert(matrix);
+        matrices_map.insert(pair<vector<int>,int>(matrix,currID));
+        lowPossibleICs.push_back(lowPossibleIC);
+        modes.push_back(1);
+        maxITs.push_back(1);
+        selected.push_back(0);
+    }
 }
 
 // find ID by matrix
@@ -603,9 +697,7 @@ void TempRateMats::rearrangeLastNItems(int topK, int N) {
 	}
 }
 
-
 // clear all items
-
 void TempRateMats::clear() {
 	for (int i=0; i<(int)matrices.size(); i++)
 		delete(matrices[i]); // checked

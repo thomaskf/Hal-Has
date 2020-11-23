@@ -157,10 +157,16 @@ public:
 	//                       (default = 1)
 	int groupAllCandidates;
 
-	// preLogFile[optional]: The output file of the previous run.
+	// preLogFile[optional]: The output CHECKPOINT file of the previous run.
 	//                       One wants to resume the process from the previous run.
 	//                       (default = "")
 	string preLogFile;
+    
+    // preLog[optional]: The output LOG file of the previous run.
+    //                       One wants to resume the process from the previous run.
+    //                       (default = "")
+    string preLog;
+
 
 	// minRateCat  : Maximum number of rate categories allowed
 	//               (default = 2)
