@@ -1,6 +1,6 @@
 /*
  *
- * RAS_mpi.h
+ * main_BU_new1.cpp
  * HAL_HAS
  *
  * CSIRO Open Source Software License Agreement (GPLv3)
@@ -51,114 +51,91 @@
  * ___________________________________________________________________
  */
 
-#ifndef __RAL_RAS__RAS_MPI__
-#define __RAL_RAS__RAS_MPI__
-
-#include <mpi.h>
-#include <iostream>
-#include <vector>
-#include "alignment.h"
-#include "core.h"
-#include "charSet.h"
-#include "tool_box.h"
-#include "matrix.h"
-#include "optimization.h"
-#include "rateMatrixResult.h"
+#include <time.h>
+#include "RAL_new.h"
+#include "RAS.h"
 #include "user_options.h"
-#include "core_mpi.h"
+#include "definitions.h"
+#include "tool_box.h"
 
-typedef struct Quad {
-	int modelType;
-	int numCat;
-	int optMode;
-	int optMaxIT;
-} Quad;
+using namespace std;
 
-struct classcomp {
-	bool operator() (const Quad& q1, const Quad& q2) const {
-		if (q1.modelType != q2.modelType)
-			return (q1.modelType < q2.modelType);
-		else if (q1.numCat != q2.numCat)
-			return q1.numCat < q2.numCat;
-		else if (q1.optMode != q2.optMode)
-			return q1.optMode < q2.optMode;
-		else
-			return q1.optMaxIT < q2.optMaxIT;
+// for HAL bottom-up algorithm
+
+int main(int argc, char** argv) {
+	
+	// Start the time measurement
+	time_t starttime = time(0);
+	
+	// check the number of bits of the OS
+	// if the number of bits is not 64, then output the warning message
+	checkOSNumOfBits();
+
+	int programType = 1; // HAL-BU
+	int HALMode = 4;  // new bottom-up algorithm version 1
+	UserOptions options(programType, HALMode);
+
+	// read the arguments and collect the user options
+	string errMsg;
+	int status = options.readArguments(argc, argv, &errMsg);
+
+	if (status==1) {
+		// error
+		cerr << errMsg << endl;
+		exit(1);
 	}
-};
 
+	if (status==2) {
+		// show the help page
+		int isMPI = 0;
+		options.outputHALBUUsage(argv[0], isMPI);
+		exit(1);
+	}
 
-// The data structure for holding the previous results from the log file
-class PreHASLogResult {
-public:
-	int num_chars;
-	vector<int> modelType;
-	vector<int> numCat;
-	vector<int> optMode;
-	vector<int> optMaxIT;
-	vector<double> loglikelihood;
-	vector<int> df;
-	vector<double> ICs;
-	vector<int> ICTypes; // icType: type of Information Criteria (1 - AIC; 2 - Adjusted BIC; 3 - BIC; 4 - CAIC)
-	vector<AllParameterSet*> PSs;
-	vector<VariableSet*> VSs;
-	map<Quad,int,classcomp> index;
+	// ======================================================
+	// new bottom-up algorithm version 1
+	options.groupAllCandidates = 1;
+	// options.topK = 10;
+	// ======================================================
 
-	PreHASLogResult(int num_chars); // Constructor
-	void readLogFile(char* logFile, int numEdges); // read the log file
-	int getRecord(int modelType, int numCat, int optMode, int optMaxIT); // get the record according to the modelType and numCat
-};
+#ifdef GET_TIME_STAT
+	options.numCPUThreads = 1;
+#endif
+	
+	// show the summary of the arguments
+	options.showSummary(0);
 
-//================================================================================================
+	char * preChkptFile = NULL;
+	if (options.preLogFile!="")
+		preChkptFile = (char*) options.preLogFile.c_str();
+    char * preLogFile = NULL;
+    if (options.preLog!="")
+        preLogFile = (char*) options.preLog.c_str();
+	char * rateGrpFile = NULL;
+	if (options.rateMatrixFile!="")
+		rateGrpFile = (char*) options.rateMatrixFile.c_str();
 
+	int num_chars_to_consider_in_model = 4;
+	performRAL(&options, rateGrpFile, preChkptFile, num_chars_to_consider_in_model, preLogFile);
 
-// perform RAS algorithm (MPI version)
-//
-// alignFile     : the alignment file
-// topFile       : the topology file
-// rateGrpFile   : the rate group file
-// minNumRateCat : the min number of rate categories allowed
-// maxNumRateCat : the max number of rate categories allowed
-// numCpuThreads : number of CPU threads is used
-// randomInt     : 0 - the parameters are initialized as default values; 1: initialized randomly
-// numIterations : number of iterations
-// prefixOut     : the prefix of the output file
-// preLogFile    : the previous HAS log file
-void performRAS(char* alignFile, char* topFile, char* rateGrpFile, int minNumRateCat, int maxNumRateCat,
-		int randomInit, int numIterations, string prefixOut, char* preLogFile, int ICType,
-		UserOptions* userOptions, int num_chars, int isGTRUpilson, int world_size, int world_rank);
+	// show the elapsed time
+	time_t endtime = time(0);
+	double secs = difftime(endtime, starttime);
+	int days,hours,mins;
+	mins = secs / 60;
+	hours = mins / 60;
+	days = hours / 24;
+	cout << "Time elapsed: ";
+	if (days > 0) {
+		cout << days << " days ";
+	}
+	if (hours > 0) {
+		cout << hours-days*24 << " hours ";
+	}
+	if (mins > 0) {
+		cout << mins-hours*60 << " mins ";
+	}
+	cout << secs-mins*60 << " seconds" << endl;
 
-// get the likelihood value
-//
-// alignFile    : the alignment file
-// topFile      : the topology file
-// paramFile    : the prefix of the parameter files
-//                the parameter files: "paramFile"1, "paramFile"2, ...
-// variableFile : the variable file
-// numRateCat   : the total number of parameter files
-// modelType    : the type of RAL-RAS model 1 - 5
-// void getLikelihoodMx(char* alignFile, char* topFile, char* paramFile, char* variableFile, int numRateCat, int modelType);
-
-
-// compute the number of substitutions for each edge
-//
-// topFile      : the topology file
-// paramFile    : the prefix of the parameter files
-//                the parameter files: "paramFile"1, "paramFile"2, ...
-// numRateCat   : the total number of parameter files
-void computeSubsEachEdge(char* topFile, char* paramFile, int numRateCat);
-
-// The procedure for RAS executed by each process
-void RASIter(Alignment* alignment, int* topMatrix, int numLineTopMat, int numIterations,
-		int frNumRateCat, int toNumRateCat, int frModelType, int toModelType,
-		vector<int>* rateMatArray, int numRateGrp, int randomInit, int isGTRUpilson, int* jobAllocated,
-		double* bestIC, AllParameterSet* bestPs, VariableSet* bestVs, string* bestModel, ofstream* foutChkpt,
-		double* summaryHASLogL, double* summaryHASIC, int* summaryHASDf, int ICType,
-		UserOptions* userOptions, int num_chars, int totProcs, int tagID);
-
-// The optimization process run by each CPU thread
-void optimThread(int* topMatrix, int numLineTopMat, Alignment* alignment, int isReversible,
-		int numSpecies, UserOptions* userOptions, int num_chars, int tagID, int randomInit,
-		int isGTRUpilson, int threadID);
-		
-#endif /* defined(__RAL_RAS__RAS_MPI__) */
+	return 0;
+}
